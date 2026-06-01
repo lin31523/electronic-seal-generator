@@ -3,6 +3,7 @@ import {
   ArrowCounterClockwise,
   Circle,
   DownloadSimple,
+  LockKey,
   SealCheck,
   Scissors,
   SlidersHorizontal,
@@ -10,6 +11,7 @@ import {
 } from "@phosphor-icons/react";
 
 const CANVAS_SIZE = 900;
+const HAS_PAID_UNLOCK = false;
 const DEFAULT_SETTINGS = {
   inkStrength: 0.92,
   shape: "circle",
@@ -40,6 +42,8 @@ const DEFAULT_SETTINGS = {
   headTextMargin: 100,
   mainTextBold: true,
   bottomTextBold: true,
+  watermarkText: "试用水印",
+  watermarkOpacity: 18,
 };
 const STORAGE_KEY = "electronic-seal-generator-settings";
 
@@ -203,6 +207,34 @@ function applyAging(ctx, size, strength = 0.12) {
   ctx.putImageData(image, 0, 0);
 }
 
+function drawTrialWatermark(ctx, size, settings) {
+  if (HAS_PAID_UNLOCK) return;
+
+  const text = settings.watermarkText.trim() || "试用水印";
+  const opacity = Math.min(0.35, Math.max(0.08, settings.watermarkOpacity / 100));
+  const fontSize = Math.round(size * 0.08);
+
+  ctx.save();
+  ctx.translate(size / 2, size / 2);
+  ctx.rotate(-Math.PI / 4);
+  ctx.globalAlpha = opacity;
+  ctx.fillStyle = "#1f2328";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.58)";
+  ctx.lineWidth = 5;
+  ctx.font = `900 ${fontSize}px ${getFontStack(settings.fontFamily)}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (let y = -size; y <= size; y += 250) {
+    for (let x = -size; x <= size; x += 430) {
+      ctx.strokeText(text, x, y);
+      ctx.fillText(text, x, y);
+    }
+  }
+
+  ctx.restore();
+}
+
 function drawTextSeal(ctx, settings) {
   const size = CANVAS_SIZE;
   const center = size / 2;
@@ -270,7 +302,8 @@ function drawTextSeal(ctx, settings) {
   }
 }
 
-function renderSeal(canvas, settings) {
+function renderSeal(canvas, settings, options = {}) {
+  const { includeWatermark = false } = options;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   canvas.width = CANVAS_SIZE;
   canvas.height = CANVAS_SIZE;
@@ -284,6 +317,8 @@ function renderSeal(canvas, settings) {
   for (let index = 3; index < finalImage.data.length; index += 4) {
     if (finalImage.data[index]) activePixels += 1;
   }
+
+  if (includeWatermark) drawTrialWatermark(ctx, CANVAS_SIZE, settings);
 
   return {
     coverage: Math.round((activePixels / (CANVAS_SIZE * CANVAS_SIZE)) * 1000) / 10,
@@ -314,7 +349,7 @@ function App() {
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const nextStats = renderSeal(canvasRef.current, settings);
+    const nextStats = renderSeal(canvasRef.current, settings, { includeWatermark: true });
     setStats(nextStats);
   }, [settings]);
 
@@ -345,7 +380,7 @@ function App() {
 
   const exportPng = () => {
     const exportCanvas = document.createElement("canvas");
-    renderSeal(exportCanvas, settings);
+    renderSeal(exportCanvas, settings, { includeWatermark: true });
     exportCanvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -366,7 +401,7 @@ function App() {
           <span className="brand-mark">印</span>
           <div>
             <h1>电子印章生成器</h1>
-            <p>公章文字配置，本地生成，透明 PNG 导出</p>
+            <p>公章文字配置，本地生成，试用导出含水印</p>
           </div>
         </div>
 
@@ -381,7 +416,7 @@ function App() {
           </button>
           <button className="primary-button" type="button" onClick={exportPng} disabled={!canExport}>
             <DownloadSimple size={19} weight="bold" />
-            导出透明 PNG
+            导出带水印 PNG
           </button>
         </div>
       </header>
@@ -391,7 +426,7 @@ function App() {
           <div className="preview-header">
             <div>
               <h2>印面预览</h2>
-              <p>红色文字、边框、防伪编号和做旧纹理都会写入透明 PNG</p>
+              <p>红色文字、边框、防伪编号、做旧纹理和试用水印都会写入 PNG</p>
             </div>
             <div className="status-chip">
               <span>{summary}</span>
@@ -408,7 +443,7 @@ function App() {
           <div className="preview-footer">
             <span>导出尺寸：900 x 900</span>
             <span>有效像素：{stats.activePixels.toLocaleString("zh-CN")}</span>
-            <span>格式：透明 PNG</span>
+            <span>格式：透明 PNG / 含水印</span>
           </div>
         </section>
 
@@ -752,11 +787,36 @@ function App() {
                 onChange={(value) => updateSetting("agingStrength", value)}
               />
 
+              <div className="watermark-card">
+                <div className="watermark-card-header">
+                  <LockKey size={19} weight="fill" />
+                  <div>
+                    <strong>试用水印</strong>
+                    <span>未接入付费前，预览和导出都会叠加水印。</span>
+                  </div>
+                </div>
+                <ControlTextInput
+                  label="水印文字"
+                  value={settings.watermarkText}
+                  onChange={(value) => updateSetting("watermarkText", value)}
+                  placeholder="试用水印"
+                />
+                <ControlSlider
+                  label="水印强度"
+                  value={settings.watermarkOpacity}
+                  min={8}
+                  max={35}
+                  step={1}
+                  suffix="%"
+                  onChange={(value) => updateSetting("watermarkOpacity", value)}
+                />
+              </div>
+
               <div className="export-card">
                 <SealCheck size={20} weight="fill" />
                 <div>
                   <strong>透明 PNG</strong>
-                  <span>导出文件会去掉背景，仅保留印章边框、文字和防伪编号。</span>
+                  <span>当前试用版导出会保留透明背景，并叠加水印；后续付费成功后可切换无水印下载。</span>
                 </div>
               </div>
             </details>

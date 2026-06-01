@@ -668,6 +668,44 @@ img {
   color: var(--blue);
 }
 
+.watermark-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(181, 35, 35, 0.2);
+  border-radius: 6px;
+  background:
+    linear-gradient(135deg, rgba(181, 35, 35, 0.08), transparent 58%),
+    #ffffff;
+}
+
+.watermark-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--seal);
+}
+
+.watermark-card-header svg {
+  flex: 0 0 auto;
+}
+
+.watermark-card-header div {
+  display: grid;
+  gap: 3px;
+}
+
+.watermark-card-header strong {
+  color: var(--ink);
+  font-size: 0.86rem;
+}
+
+.watermark-card-header span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .color-control {
   display: grid;
   gap: 10px;
