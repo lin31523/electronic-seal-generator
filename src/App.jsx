@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowCounterClockwise,
+  CheckCircle,
   Circle,
+  CreditCard,
   DownloadSimple,
   LockKey,
+  QrCode,
   SealCheck,
   Scissors,
   SlidersHorizontal,
   Square,
+  X,
 } from "@phosphor-icons/react";
 
 const CANVAS_SIZE = 900;
-const HAS_PAID_UNLOCK = false;
+const PAID_PRICE_LABEL = "¥1";
 const DEFAULT_SETTINGS = {
   inkStrength: 0.92,
   shape: "circle",
@@ -46,6 +50,7 @@ const DEFAULT_SETTINGS = {
   watermarkOpacity: 18,
 };
 const STORAGE_KEY = "electronic-seal-generator-settings";
+const PAYMENT_STORAGE_KEY = "electronic-seal-generator-paid-unlock";
 
 const shapeOptions = [
   { value: "none", label: "无", icon: Scissors },
@@ -208,8 +213,6 @@ function applyAging(ctx, size, strength = 0.12) {
 }
 
 function drawTrialWatermark(ctx, size, settings) {
-  if (HAS_PAID_UNLOCK) return;
-
   const text = settings.watermarkText.trim() || "试用水印";
   const opacity = Math.min(0.35, Math.max(0.08, settings.watermarkOpacity / 100));
   const fontSize = Math.round(size * 0.08);
@@ -344,14 +347,20 @@ function App() {
   });
   const [stats, setStats] = useState({ coverage: 0, activePixels: 0 });
   const [savedNotice, setSavedNotice] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paidUnlock, setPaidUnlock] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(PAYMENT_STORAGE_KEY) === "unlocked";
+  });
   const canExport = true;
+  const shouldShowWatermark = !paidUnlock;
 
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const nextStats = renderSeal(canvasRef.current, settings, { includeWatermark: true });
+    const nextStats = renderSeal(canvasRef.current, settings, { includeWatermark: shouldShowWatermark });
     setStats(nextStats);
-  }, [settings]);
+  }, [settings, shouldShowWatermark]);
 
   const summary = useMemo(() => {
     if (stats.coverage <= 1) return "印面偏少";
@@ -378,9 +387,25 @@ function App() {
     }
   };
 
+  const openPayment = () => {
+    if (paidUnlock) return;
+    setPaymentOpen(true);
+  };
+
+  const confirmPaymentUnlock = () => {
+    window.localStorage.setItem(PAYMENT_STORAGE_KEY, "unlocked");
+    setPaidUnlock(true);
+    setPaymentOpen(false);
+  };
+
+  const resetPaymentUnlock = () => {
+    window.localStorage.removeItem(PAYMENT_STORAGE_KEY);
+    setPaidUnlock(false);
+  };
+
   const exportPng = () => {
     const exportCanvas = document.createElement("canvas");
-    renderSeal(exportCanvas, settings, { includeWatermark: true });
+    renderSeal(exportCanvas, settings, { includeWatermark: shouldShowWatermark });
     exportCanvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -401,7 +426,7 @@ function App() {
           <span className="brand-mark">印</span>
           <div>
             <h1>电子印章生成器</h1>
-            <p>公章文字配置，本地生成，试用导出含水印</p>
+            <p>{paidUnlock ? "已解锁无水印导出，本地生成透明 PNG" : "公章文字配置，本地生成，试用导出含水印"}</p>
           </div>
         </div>
 
@@ -414,9 +439,13 @@ function App() {
             <ArrowCounterClockwise size={18} />
             重置
           </button>
+          <button className={`ghost-button unlock-button ${paidUnlock ? "is-active" : ""}`} type="button" onClick={openPayment}>
+            {paidUnlock ? <CheckCircle size={18} weight="fill" /> : <CreditCard size={18} />}
+            {paidUnlock ? "已去水印" : `${PAID_PRICE_LABEL} 去水印`}
+          </button>
           <button className="primary-button" type="button" onClick={exportPng} disabled={!canExport}>
             <DownloadSimple size={19} weight="bold" />
-            导出带水印 PNG
+            {paidUnlock ? "导出透明 PNG" : "导出带水印 PNG"}
           </button>
         </div>
       </header>
@@ -426,7 +455,7 @@ function App() {
           <div className="preview-header">
             <div>
               <h2>印面预览</h2>
-              <p>红色文字、边框、防伪编号、做旧纹理和试用水印都会写入 PNG</p>
+              <p>{paidUnlock ? "已解锁无水印导出，透明 PNG 仅保留印章内容" : "红色文字、边框、防伪编号、做旧纹理和试用水印都会写入 PNG"}</p>
             </div>
             <div className="status-chip">
               <span>{summary}</span>
@@ -443,7 +472,7 @@ function App() {
           <div className="preview-footer">
             <span>导出尺寸：900 x 900</span>
             <span>有效像素：{stats.activePixels.toLocaleString("zh-CN")}</span>
-            <span>格式：透明 PNG / 含水印</span>
+            <span>格式：透明 PNG / {paidUnlock ? "无水印" : "含水印"}</span>
           </div>
         </section>
 
@@ -789,41 +818,101 @@ function App() {
 
               <div className="watermark-card">
                 <div className="watermark-card-header">
-                  <LockKey size={19} weight="fill" />
+                  {paidUnlock ? <CheckCircle size={19} weight="fill" /> : <LockKey size={19} weight="fill" />}
                   <div>
-                    <strong>试用水印</strong>
-                    <span>未接入付费前，预览和导出都会叠加水印。</span>
+                    <strong>{paidUnlock ? "已解锁无水印" : "试用水印"}</strong>
+                    <span>{paidUnlock ? "当前预览和导出均不会叠加水印。" : "未支付前，预览和导出都会叠加水印。"}</span>
                   </div>
                 </div>
-                <ControlTextInput
-                  label="水印文字"
-                  value={settings.watermarkText}
-                  onChange={(value) => updateSetting("watermarkText", value)}
-                  placeholder="试用水印"
-                />
-                <ControlSlider
-                  label="水印强度"
-                  value={settings.watermarkOpacity}
-                  min={8}
-                  max={35}
-                  step={1}
-                  suffix="%"
-                  onChange={(value) => updateSetting("watermarkOpacity", value)}
-                />
+                {!paidUnlock && (
+                  <>
+                    <ControlTextInput
+                      label="水印文字"
+                      value={settings.watermarkText}
+                      onChange={(value) => updateSetting("watermarkText", value)}
+                      placeholder="试用水印"
+                    />
+                    <ControlSlider
+                      label="水印强度"
+                      value={settings.watermarkOpacity}
+                      min={8}
+                      max={35}
+                      step={1}
+                      suffix="%"
+                      onChange={(value) => updateSetting("watermarkOpacity", value)}
+                    />
+                    <button className="unlock-cta" type="button" onClick={openPayment}>
+                      <CreditCard size={18} />
+                      支付 {PAID_PRICE_LABEL} 去水印下载
+                    </button>
+                  </>
+                )}
+                {paidUnlock && (
+                  <button className="secondary-action" type="button" onClick={resetPaymentUnlock}>
+                    恢复试用状态
+                  </button>
+                )}
               </div>
 
               <div className="export-card">
                 <SealCheck size={20} weight="fill" />
                 <div>
                   <strong>透明 PNG</strong>
-                  <span>当前试用版导出会保留透明背景，并叠加水印；后续付费成功后可切换无水印下载。</span>
+                  <span>{paidUnlock ? "付费解锁状态下会导出透明背景、无水印 PNG。" : "当前试用版导出会保留透明背景，并叠加水印；支付成功后切换无水印下载。"}</span>
                 </div>
               </div>
             </details>
           </div>
         </section>
       </section>
+      {paymentOpen && (
+        <PaymentDialog onClose={() => setPaymentOpen(false)} onConfirm={confirmPaymentUnlock} />
+      )}
     </main>
+  );
+}
+
+function PaymentDialog({ onClose, onConfirm }) {
+  return (
+    <div className="payment-overlay" role="presentation">
+      <section className="payment-dialog" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+        <button className="dialog-close" type="button" onClick={onClose} aria-label="关闭支付弹窗">
+          <X size={18} />
+        </button>
+        <div className="payment-dialog-header">
+          <span className="payment-icon">
+            <QrCode size={28} weight="duotone" />
+          </span>
+          <div>
+            <h2 id="payment-title">支付去水印</h2>
+            <p>支付 {PAID_PRICE_LABEL} 后，当前浏览器可导出无水印透明 PNG。</p>
+          </div>
+        </div>
+
+        <div className="payment-summary">
+          <span>订单内容</span>
+          <strong>电子印章无水印下载</strong>
+          <span>支付金额</span>
+          <strong>{PAID_PRICE_LABEL}</strong>
+        </div>
+
+        <div className="qr-placeholder" aria-label="支付二维码占位">
+          <QrCode size={70} />
+          <strong>支付二维码占位</strong>
+          <span>接入微信 / 支付宝后，这里会展示真实收款二维码。</span>
+        </div>
+
+        <div className="payment-actions">
+          <button className="ghost-button" type="button" onClick={onClose}>
+            稍后再说
+          </button>
+          <button className="primary-button" type="button" onClick={onConfirm}>
+            <CheckCircle size={18} weight="fill" />
+            测试确认支付，去水印
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
