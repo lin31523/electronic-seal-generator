@@ -1,556 +1,816 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown,
-  ArrowRight,
-  BookOpenText,
-  BracketsCurly,
-  CaretLeft,
-  CaretRight,
-  Compass,
-  CopySimple,
-  DotsSixVertical,
-  Eye,
-  Feather,
-  FrameCorners,
-  Lightning,
-  MouseSimple,
-  PenNib,
-  Shuffle,
-  Sparkle,
-  Stack,
+  ArrowCounterClockwise,
+  Circle,
+  DownloadSimple,
+  SealCheck,
+  Scissors,
+  SlidersHorizontal,
+  Square,
 } from "@phosphor-icons/react";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ScrollToPlugin } from "gsap/ScrollToPlugin";
-import { Flip } from "gsap/Flip";
-import { Draggable } from "gsap/Draggable";
-import { Observer } from "gsap/Observer";
 
-gsap.registerPlugin(useGSAP, ScrollTrigger, ScrollToPlugin, Flip, Draggable, Observer);
-gsap.defaults({ duration: 0.7, ease: "power3.out" });
+const CANVAS_SIZE = 900;
+const DEFAULT_SETTINGS = {
+  inkStrength: 0.92,
+  shape: "circle",
+  sealType: "company",
+  mainText: "旭格国际建材（北京）有限公司",
+  bottomText: "合同专用章",
+  antiCodeEnabled: false,
+  antiCodeText: "NO.20260529",
+  centerText: "★",
+  headText: "电子印章",
+  fontFamily: "default",
+  lineWidth: 10,
+  borderMode: "double",
+  sealSize: 300,
+  sealColor: "#b52323",
+  aging: true,
+  agingStrength: 10,
+  mainTextSize: 100,
+  bottomTextSize: 100,
+  headTextSize: 100,
+  centerTextSize: 100,
+  mainTextArc: 100,
+  bottomTextArc: 100,
+  mainTextSpacing: 100,
+  bottomTextSpacing: 100,
+  mainTextMargin: 100,
+  bottomTextMargin: 100,
+  headTextMargin: 100,
+  mainTextBold: true,
+  bottomTextBold: true,
+};
+const STORAGE_KEY = "electronic-seal-generator-settings";
 
-const articles = [
-  {
-    id: "slow-code",
-    title: "慢代码，锋利边缘",
-    category: "过程",
-    minutes: 8,
-    metric: "3.74万",
-    image: "/images/article-process.jpg",
-    excerpt: "关于界面创作的一则札记：少一点假设，多一点草图，再给思考留一点安静。",
-  },
-  {
-    id: "small-tools",
-    title: "我信任的小工具",
-    category: "工具",
-    minutes: 6,
-    metric: "1.28万",
-    image: "/images/article-tools.jpg",
-    excerpt: "那些每次重启后依然留下来的工具：一张清单，一个捕捉习惯，一条严格的命名规则。",
-  },
-  {
-    id: "field-systems",
-    title: "给动荡周次的田野系统",
-    category: "系统",
-    minutes: 11,
-    metric: "2.41万",
-    image: "/images/article-system.jpg",
-    excerpt: "我如何让研究、草稿和开放问题继续移动，同时不假装每一周都可以被完美预测。",
-  },
-  {
-    id: "interface-weather",
-    title: "界面的天气",
-    category: "设计",
-    minutes: 9,
-    metric: "1.86万",
-    image: "/images/article-design.jpg",
-    excerpt: "一篇关于光线、密度、节奏的设计日记，也关于细小动效如何改变界面的体感温度。",
-  },
-  {
-    id: "motion-ethics",
-    title: "动效的伦理",
-    category: "动效",
-    minutes: 7,
-    metric: "3.17万",
-    image: "/images/article-motion.jpg",
-    excerpt: "动画应该澄清状态，而不是索取注意力。这里有几条判断动效是否值得存在的测试。",
-  },
+const shapeOptions = [
+  { value: "none", label: "无", icon: Scissors },
+  { value: "circle", label: "圆章", icon: Circle },
+  { value: "ellipse", label: "椭圆", icon: Circle },
+  { value: "square", label: "方章", icon: Square },
 ];
 
-const dispatches = [
-  "可迁移的笔记应该像工具一样变旧，而不是像公告一样过期。",
-  "个人网站可以是工作间，不必把自己伪装成仪表盘。",
-  "当动效能教会手指界面去了哪里，它才真正有用。",
-  "在文章知道自己要成为什么之前，先写下边注。",
+const sealTypeOptions = [
+  { value: "company", label: "公章" },
+  { value: "private", label: "私章" },
 ];
 
-const categories = ["全部", "设计", "动效", "过程", "系统", "工具"];
-
-const skillCards = [
-  ["gsap-core", "补间语法", "文字、图像层和悬停状态都以克制的方式移动。"],
-  ["gsap-timeline", "入场编排", "第一屏像一段短小的编辑序列一样展开。"],
-  ["gsap-scrolltrigger", "阅读中的运动", "页面用进度、纵深和横向笔记回应滚动。"],
-  ["gsap-plugins", "界面行为", "导航、排序、拖拽和方向手势都保留触感。"],
-  ["gsap-utils", "动效数学", "数值会吸附、循环、映射，形成有意图的运动。"],
-  ["gsap-react", "局部清理", "每个组件都把动画收束在自己的标记结构里。"],
-  ["gsap-performance", "合成优先", "动效保持轻、稳、快，不打扰指尖。"],
-  ["gsap-frameworks", "可迁移生命周期", "同一套纪律也能带进 Vue 和 Svelte 的笔记。"],
+const borderModeOptions = [
+  { value: "single", label: "单线条" },
+  { value: "double", label: "双线条" },
 ];
 
-const frameworkSnippets = [
-  {
-    label: "Vue",
-    code:
-      "onMounted(() => {\n  ctx = gsap.context(() => {\n    gsap.from('.note', { autoAlpha: 0, y: 24 });\n  }, container.value);\n});\nonUnmounted(() => ctx?.revert());",
-  },
-  {
-    label: "Svelte",
-    code:
-      "onMount(() => {\n  const ctx = gsap.context(() => {\n    gsap.to('.rail', { x: 80, duration: 0.6 });\n  }, container);\n  return () => ctx.revert();\n});",
-  },
+const fontOptions = [
+  { value: "default", label: "默认" },
+  { value: "yahei", label: "微软雅黑" },
+  { value: "songti", label: "宋体" },
+  { value: "heiti", label: "黑体" },
+  { value: "kaiti", label: "楷体" },
+  { value: "fangsong", label: "仿宋" },
 ];
+
+const fontStacks = {
+  default: '"PingFang SC", "Microsoft YaHei", sans-serif',
+  yahei: '"Microsoft YaHei", "PingFang SC", sans-serif',
+  songti: '"SimSun", "Songti SC", serif',
+  heiti: '"SimHei", "Heiti SC", sans-serif',
+  kaiti: '"KaiTi", "Kaiti SC", serif',
+  fangsong: '"FangSong", "FangSong_GB2312", serif',
+};
+
+function getFontStack(fontFamily) {
+  return fontStacks[fontFamily] || fontStacks.default;
+}
+
+function drawGuide(ctx, size, settings, alpha = 0.5) {
+  const { shape, lineWidth, sealColor, borderMode } = settings;
+  if (shape === "none") return;
+
+  const margin = Math.round(size * 0.07);
+  ctx.save();
+  ctx.strokeStyle = sealColor;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = Math.max(4, lineWidth);
+  ctx.lineJoin = "round";
+
+  if (shape === "circle") {
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - margin, 0, Math.PI * 2);
+    ctx.stroke();
+    if (borderMode === "single") {
+      ctx.restore();
+      return;
+    }
+    ctx.lineWidth = Math.max(2, lineWidth * 0.42);
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - margin - lineWidth * 2.8, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (shape === "ellipse") {
+    ctx.beginPath();
+    ctx.ellipse(size / 2, size / 2, size / 2 - margin, (size / 2 - margin) * 0.75, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    if (borderMode === "single") {
+      ctx.restore();
+      return;
+    }
+    ctx.lineWidth = Math.max(2, lineWidth * 0.42);
+    ctx.beginPath();
+    ctx.ellipse(size / 2, size / 2, size / 2 - margin - lineWidth * 2.8, (size / 2 - margin - lineWidth * 2.8) * 0.75, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.strokeRect(margin, margin, size - margin * 2, size - margin * 2);
+    if (borderMode === "single") {
+      ctx.restore();
+      return;
+    }
+    ctx.lineWidth = Math.max(2, lineWidth * 0.42);
+    ctx.strokeRect(margin + lineWidth * 2.4, margin + lineWidth * 2.4, size - (margin + lineWidth * 2.4) * 2, size - (margin + lineWidth * 2.4) * 2);
+  }
+
+  ctx.restore();
+}
+
+function drawArcText(ctx, text, centerX, centerY, radius, startAngle, endAngle, fontSize, color, options = {}) {
+  const chars = [...text.trim()];
+  if (!chars.length) return;
+
+  const reverse = Boolean(options.reverse);
+  const weight = options.bold === false ? 500 : 800;
+  const span = (endAngle - startAngle) * (options.spacing ?? 1);
+  const mid = (startAngle + endAngle) / 2;
+  const adjustedStart = mid - span / 2;
+  const step = chars.length === 1 ? 0 : span / (chars.length - 1);
+
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `${weight} ${fontSize}px ${getFontStack(options.fontFamily)}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  chars.forEach((char, index) => {
+    const angle = adjustedStart + step * index;
+    const x = centerX + Math.cos(angle) * radius;
+    const y = centerY + Math.sin(angle) * radius;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(reverse ? angle - Math.PI / 2 : angle + Math.PI / 2);
+    ctx.fillText(char, 0, 0);
+    ctx.restore();
+  });
+
+  ctx.restore();
+}
+
+function drawCenteredText(ctx, text, x, y, maxWidth, fontSize, color, weight = 800, fontFamily = "default") {
+  const content = text.trim();
+  if (!content) return;
+
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `${weight} ${fontSize}px ${getFontStack(fontFamily)}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  let nextSize = fontSize;
+  while (ctx.measureText(content).width > maxWidth && nextSize > 22) {
+    nextSize -= 2;
+    ctx.font = `${weight} ${nextSize}px ${getFontStack(fontFamily)}`;
+  }
+
+  ctx.fillText(content, x, y);
+  ctx.restore();
+}
+
+function drawAntiCode(ctx, settings, center, scale, radius, color) {
+  if (!settings.antiCodeEnabled || !settings.antiCodeText.trim()) return;
+
+  const y = center + 185 * scale;
+  drawCenteredText(ctx, settings.antiCodeText, center, y, radius * 1.1, 28 * scale, color, 700, settings.fontFamily);
+}
+
+function applyAging(ctx, size, strength = 0.12) {
+  const image = ctx.getImageData(0, 0, size, size);
+  for (let index = 0; index < image.data.length; index += 4) {
+    const alpha = image.data[index + 3];
+    if (!alpha) continue;
+
+    const pixel = index / 4;
+    const x = pixel % size;
+    const y = Math.floor(pixel / size);
+    const noise = ((x * 37 + y * 19 + ((x * y) % 47)) % 100) / 100;
+    if (noise < strength) image.data[index + 3] = Math.max(0, alpha - 150);
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
+function drawTextSeal(ctx, settings) {
+  const size = CANVAS_SIZE;
+  const center = size / 2;
+  const scale = settings.sealSize / 300;
+  const radius = size * 0.38 * scale;
+  const color = settings.sealColor;
+  const mainSize = settings.mainTextSize / 100;
+  const bottomSize = settings.bottomTextSize / 100;
+  const headSize = settings.headTextSize / 100;
+  const centerSize = settings.centerTextSize / 100;
+  const mainArc = settings.mainTextArc / 100;
+  const bottomArc = settings.bottomTextArc / 100;
+  const mainSpacing = settings.mainTextSpacing / 100;
+  const bottomSpacing = settings.bottomTextSpacing / 100;
+  const mainMargin = settings.mainTextMargin / 100;
+  const bottomMargin = settings.bottomTextMargin / 100;
+  const headMargin = settings.headTextMargin / 100;
+
+  drawGuide(ctx, size, settings, settings.inkStrength);
+
+  if (settings.sealType === "private") {
+    drawCenteredText(ctx, settings.mainText || "个人私章", center, center - 10, radius * 1.25, 96 * scale * mainSize, color, 900, settings.fontFamily);
+    if (settings.centerText) {
+      drawCenteredText(ctx, settings.centerText, center, center + 126 * scale, radius * 0.9, 58 * scale * centerSize, color, 900, settings.fontFamily);
+    }
+    return;
+  }
+
+  const arcRadius = settings.shape === "ellipse" ? radius * 0.86 : radius * 0.94;
+  const mainSpan = 0.64 * mainArc;
+  const bottomSpan = 0.44 * bottomArc;
+  drawArcText(
+    ctx,
+    settings.mainText,
+    center,
+    center,
+    arcRadius * mainMargin,
+    Math.PI * (1.5 - mainSpan / 2),
+    Math.PI * (1.5 + mainSpan / 2),
+    42 * scale * mainSize,
+    color,
+    { spacing: mainSpacing, bold: settings.mainTextBold, fontFamily: settings.fontFamily }
+  );
+
+  if (settings.centerText) {
+    drawCenteredText(ctx, settings.centerText, center, center - 18 * scale, radius * 0.75, 82 * scale * centerSize, color, 900, settings.fontFamily);
+  }
+
+  drawCenteredText(ctx, settings.headText, center, center + 122 * scale * headMargin, radius * 1.25, 44 * scale * headSize, color, 800, settings.fontFamily);
+  drawAntiCode(ctx, settings, center, scale, radius, color);
+
+  if (settings.bottomText) {
+    drawArcText(
+      ctx,
+      settings.bottomText,
+      center,
+      center,
+      arcRadius * 0.82 * bottomMargin,
+      Math.PI * (0.5 - bottomSpan / 2),
+      Math.PI * (0.5 + bottomSpan / 2),
+      34 * scale * bottomSize,
+      color,
+      { reverse: true, spacing: bottomSpacing, bold: settings.bottomTextBold, fontFamily: settings.fontFamily }
+    );
+  }
+}
+
+function renderSeal(canvas, settings) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  drawTextSeal(ctx, settings);
+  if (settings.aging) applyAging(ctx, CANVAS_SIZE, settings.agingStrength / 100);
+
+  const finalImage = ctx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  let activePixels = 0;
+  for (let index = 3; index < finalImage.data.length; index += 4) {
+    if (finalImage.data[index]) activePixels += 1;
+  }
+
+  return {
+    coverage: Math.round((activePixels / (CANVAS_SIZE * CANVAS_SIZE)) * 1000) / 10,
+    activePixels,
+  };
+}
+
+function getExportFileName(settings) {
+  const safeName = settings.mainText.trim().replace(/[\\/:*?"<>|]/g, "").slice(0, 48);
+  return `${safeName || "电子印章"}.png`;
+}
 
 function App() {
-  const rootRef = useRef(null);
-  const dragRef = useRef(null);
-  const articleGridRef = useRef(null);
-  const flipStateRef = useRef(null);
-  const [filter, setFilter] = useState("全部");
-  const [snippetIndex, setSnippetIndex] = useState(0);
-
-  const visibleArticles = useMemo(() => {
-    if (filter === "全部") return articles;
-    return articles.filter((article) => article.category === filter);
-  }, [filter]);
-
-  useGSAP(
-    (context, contextSafe) => {
-      const q = gsap.utils.selector(rootRef);
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const cleanupFns = [];
-      const pluginInstances = [];
-
-      const heroTimeline = gsap.timeline({
-        defaults: { duration: reduceMotion ? 0 : 0.8, ease: "power3.out" },
-      });
-
-      heroTimeline
-        .addLabel("intro")
-        .from(q(".nav-shell"), { autoAlpha: 0, y: -18 }, "intro")
-        .from(q(".hero-kicker"), { autoAlpha: 0, y: 18 }, "intro+=0.1")
-        .from(q(".hero-title-line"), { autoAlpha: 0, yPercent: 105, stagger: 0.08 }, "intro+=0.12")
-        .from(q(".hero-copy"), { autoAlpha: 0, y: 18 }, "intro+=0.38")
-        .from(q(".cover-card"), { autoAlpha: 0, y: 34, rotation: -2, stagger: 0.08 }, "intro+=0.28")
-        .from(q(".hero-stat"), { autoAlpha: 0, y: 16, stagger: 0.06 }, "intro+=0.5");
-
-      const mm = gsap.matchMedia(rootRef.current);
-
-      mm.add(
-        {
-          isDesktop: "(min-width: 860px)",
-          reduceMotion: "(prefers-reduced-motion: reduce)",
-        },
-        ({ conditions }) => {
-          if (conditions.reduceMotion) return undefined;
-
-          gsap.to(q(".portrait-plate"), {
-            yPercent: conditions.isDesktop ? -9 : -3,
-            ease: "none",
-            scrollTrigger: {
-              trigger: q(".hero")[0],
-              start: "top top",
-              end: "bottom top",
-              scrub: 1,
-            },
-          });
-
-          const horizontal = q(".notebook-track")[0];
-          if (horizontal && conditions.isDesktop) {
-            const panels = q(".notebook-panel");
-            const scrollTween = gsap.to(horizontal, {
-              x: () => -(horizontal.scrollWidth - window.innerWidth * 0.82),
-              ease: "none",
-              scrollTrigger: {
-                trigger: q(".notebook-section")[0],
-                start: "top top",
-                end: () => `+=${horizontal.scrollWidth}`,
-                pin: true,
-                scrub: 1,
-                refreshPriority: 2,
-              },
-            });
-
-            panels.forEach((panel) => {
-              gsap.from(panel.querySelector(".panel-inner"), {
-                y: 42,
-                autoAlpha: 0,
-                scrollTrigger: {
-                  trigger: panel,
-                  containerAnimation: scrollTween,
-                  start: "left 72%",
-                  toggleActions: "play none none reverse",
-                },
-              });
-            });
-          }
-
-          return undefined;
-        }
-      );
-
-      ScrollTrigger.batch(q(".article-card"), {
-        start: "top 82%",
-        interval: 0.08,
-        batchMax: 3,
-        onEnter: (batch) => {
-          gsap.to(batch, {
-            autoAlpha: 1,
-            y: 0,
-            stagger: 0.08,
-            overwrite: true,
-          });
-        },
-        onLeaveBack: (batch) => {
-          gsap.set(batch, { autoAlpha: 0, y: 34, overwrite: true });
-        },
-      });
-
-      gsap.to(q(".progress-line"), {
-        scaleY: 1,
-        transformOrigin: "top",
-        ease: "none",
-        scrollTrigger: {
-          trigger: rootRef.current,
-          start: "top top",
-          end: "bottom bottom",
-          scrub: 0.8,
-        },
-      });
-
-      const mapToRotation = gsap.utils.pipe(
-        gsap.utils.normalize(0, 1),
-        gsap.utils.mapRange(0, 1, -18, 18),
-        gsap.utils.snap(0.5)
-      );
-
-      q(".cover-card").forEach((card, index) => {
-        const rotateTo = gsap.quickTo(card, "rotation", { duration: 0.45, ease: "power3" });
-        const yTo = gsap.quickTo(card, "y", { duration: 0.45, ease: "power3" });
-        const onMove = contextSafe((event) => {
-          const rect = card.getBoundingClientRect();
-          const progress = gsap.utils.clamp(0, 1, (event.clientX - rect.left) / rect.width);
-          rotateTo(mapToRotation(progress));
-          yTo(gsap.utils.wrap([-10, -6, -12], index));
-        });
-        const onLeave = contextSafe(() => {
-          rotateTo(0);
-          yTo(0);
-        });
-        card.addEventListener("pointermove", onMove);
-        card.addEventListener("pointerleave", onLeave);
-        cleanupFns.push(() => {
-          card.removeEventListener("pointermove", onMove);
-          card.removeEventListener("pointerleave", onLeave);
-        });
-      });
-
-      if (dragRef.current) {
-        pluginInstances.push(...Draggable.create(dragRef.current, {
-          type: "x",
-          bounds: dragRef.current.parentElement,
-          edgeResistance: 0.72,
-          cursor: "grab",
-          onDragEnd() {
-            gsap.to(this.target, { x: gsap.utils.snap(24, this.x), duration: 0.35 });
-          },
-        }));
-      }
-
-      pluginInstances.push(Observer.create({
-        target: q(".snippet-stage")[0],
-        type: "touch,pointer",
-        tolerance: 18,
-        onLeft: contextSafe(() => setSnippetIndex((value) => (value + 1) % frameworkSnippets.length)),
-        onRight: contextSafe(() =>
-          setSnippetIndex((value) => (value - 1 + frameworkSnippets.length) % frameworkSnippets.length)
-        ),
-      }));
-
-      ScrollTrigger.refresh();
-      return () => {
-        cleanupFns.forEach((cleanup) => cleanup());
-        pluginInstances.forEach((instance) => instance?.kill?.());
-        mm.revert();
-      };
-    },
-    { scope: rootRef }
-  );
-
-  useGSAP(
-    () => {
-      const state = flipStateRef.current;
-      if (!articleGridRef.current || !state) return;
-      Flip.from(state, {
-        duration: 0.55,
-        ease: "power2.inOut",
-        absolute: true,
-        stagger: 0.035,
-        onComplete: () => ScrollTrigger.refresh(),
-      });
-      flipStateRef.current = null;
-    },
-    { dependencies: [filter], scope: articleGridRef }
-  );
-
-  const applyFilter = (nextFilter) => {
-    if (articleGridRef.current) {
-      flipStateRef.current = Flip.getState(articleGridRef.current.querySelectorAll(".article-card"));
+  const canvasRef = useRef(null);
+  const [settings, setSettings] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_SETTINGS;
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+    } catch {
+      return DEFAULT_SETTINGS;
     }
-    setFilter(nextFilter);
+  });
+  const [stats, setStats] = useState({ coverage: 0, activePixels: 0 });
+  const [savedNotice, setSavedNotice] = useState(false);
+  const canExport = true;
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const nextStats = renderSeal(canvasRef.current, settings);
+    setStats(nextStats);
+  }, [settings]);
+
+  const summary = useMemo(() => {
+    if (stats.coverage <= 1) return "印面偏少";
+    if (stats.coverage >= 55) return "印面偏满";
+    return "印面可用";
+  }, [stats.coverage]);
+
+  const updateSetting = (key, value) => {
+    setSettings((current) => ({ ...current, [key]: value }));
   };
 
-  const scrollTo = (target) => {
-    gsap.to(window, {
-      duration: 0.9,
-      ease: "power3.inOut",
-      scrollTo: { y: target, offsetY: 72 },
-    });
+  const resetSettings = () => {
+    setSettings(DEFAULT_SETTINGS);
+    setSavedNotice(false);
   };
 
-  const changeSnippet = (direction) => {
-    setSnippetIndex((value) =>
-      direction === "next"
-        ? (value + 1) % frameworkSnippets.length
-        : (value - 1 + frameworkSnippets.length) % frameworkSnippets.length
-    );
+  const saveSettings = () => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      setSavedNotice(true);
+      window.setTimeout(() => setSavedNotice(false), 1800);
+    } catch {
+      setSavedNotice(false);
+    }
+  };
+
+  const exportPng = () => {
+    const exportCanvas = document.createElement("canvas");
+    renderSeal(exportCanvas, settings);
+    exportCanvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = getExportFileName(settings);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, "image/png");
   };
 
   return (
-    <main ref={rootRef} className="site-shell">
-      <aside className="scroll-progress" aria-hidden="true">
-        <span className="progress-line" />
-      </aside>
-
-      <nav className="nav-shell" aria-label="主导航">
-        <button className="brand-mark" onClick={() => scrollTo(".hero")} aria-label="回到顶部">
-          <PenNib size={18} weight="duotone" />
-          <span>田野笔记</span>
-        </button>
-        <div className="nav-actions">
-          <button onClick={() => scrollTo(".journal-section")}>文章</button>
-          <button onClick={() => scrollTo(".notebook-section")}>笔记</button>
-          <button onClick={() => scrollTo(".skill-section")}>技术栈</button>
-        </div>
-      </nav>
-
-      <section className="hero" id="top">
-        <div className="hero-copy-block">
-          <p className="hero-kicker">关于设计、代码与工作笔记的个人博客</p>
-          <h1 className="hero-title">
-            <span className="line-mask">
-              <span className="hero-title-line">安静系统</span>
-            </span>
-            <span className="line-mask">
-              <span className="hero-title-line">容纳</span>
-            </span>
-            <span className="line-mask">
-              <span className="hero-title-line">不安分的</span>
-            </span>
-            <span className="line-mask">
-              <span className="hero-title-line">想法。</span>
-            </span>
-          </h1>
-          <p className="hero-copy">
-            这是一本持续生长的工作笔记，记录界面手艺、研究习惯，以及让野心勃勃的项目仍然保持人味的小工具。
-          </p>
-          <div className="hero-cta-row">
-            <button className="primary-action" onClick={() => scrollTo(".journal-section")}>
-              <BookOpenText size={18} />
-              阅读文章
-            </button>
-            <button className="ghost-action" onClick={() => scrollTo(".skill-section")}>
-              <Lightning size={18} />
-              动效技术栈
-            </button>
-          </div>
-          <div className="hero-stats" aria-label="博客统计">
-            {[
-              ["47", "篇文章"],
-              ["6.8", "年记录"],
-              ["128", "则笔记"],
-            ].map(([value, label]) => (
-              <div className="hero-stat" key={label}>
-                <strong>{value}</strong>
-                <span>{label}</span>
-              </div>
-            ))}
+    <main className="seal-app">
+      <header className="tool-bar">
+        <div className="brand-lockup">
+          <span className="brand-mark">印</span>
+          <div>
+            <h1>电子印章生成器</h1>
+            <p>公章文字配置，本地生成，透明 PNG 导出</p>
           </div>
         </div>
 
-        <div className="hero-visual" aria-label="精选视觉笔记">
-          <div className="portrait-plate">
-            <img
-              src="/images/hero.jpg"
-              alt="有笔记本、屏幕光和打印草稿的编辑桌面"
-            />
-          </div>
-          {articles.slice(0, 3).map((article, index) => (
-            <article className={`cover-card cover-card-${index + 1}`} key={article.id}>
-              <img src={article.image} alt="" />
-              <div>
-                <span>{article.category}</span>
-                <strong>{article.title}</strong>
-              </div>
-            </article>
-          ))}
-        </div>
-        <button className="scroll-cue" onClick={() => scrollTo(".journal-section")} aria-label="滚动到文章列表">
-          <ArrowDown size={18} />
-        </button>
-      </section>
-
-      <section className="journal-section" id="journal">
-        <div className="section-heading">
-          <p>文章</p>
-          <h2>近期文章，给阅读留一点余地。</h2>
-          <span>
-            从工作桌边整理出的草稿，按主题归类，适合慢一点读。
-          </span>
-        </div>
-
-        <div className="filter-row" aria-label="文章筛选">
-          {categories.map((category) => (
-            <button
-              key={category}
-              className={filter === category ? "active" : ""}
-              onClick={() => applyFilter(category)}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-
-        <div className="article-grid" ref={articleGridRef}>
-          {visibleArticles.map((article, index) => (
-            <article className="article-card" key={article.id} style={{ "--card-index": index }}>
-              <div className="article-image">
-                <img src={article.image} alt="" />
-              </div>
-              <div className="article-body">
-                <div className="article-meta">
-                  <span>{article.category}</span>
-                  <span>{article.minutes} 分钟</span>
-                </div>
-                <h3>{article.title}</h3>
-                <p>{article.excerpt}</p>
-                <div className="article-footer">
-                  <span>{article.metric} 次阅读</span>
-                  <button aria-label={`打开《${article.title}》`}>
-                    <ArrowRight size={18} />
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="dispatch-section">
-        <div className="dispatch-copy">
-          <p>现场边注</p>
-          <h2>页面保持安静的节奏，草稿继续移动。</h2>
-        </div>
-        <div className="drag-field">
-          <div className="drag-note" ref={dragRef}>
-            <DotsSixVertical size={22} />
-            <span>草稿节奏</span>
-            <strong>62%</strong>
-          </div>
-        </div>
-        <div className="dispatch-list">
-          {dispatches.map((dispatch, index) => (
-            <p key={dispatch} style={{ "--dispatch-index": index }}>
-              {dispatch}
-            </p>
-          ))}
-        </div>
-      </section>
-
-      <section className="notebook-section">
-        <div className="notebook-track">
-          {[
-            ["01", "研究", "在大纲变硬之前，先收集截图、碎片和问题。"],
-            ["02", "起草", "公开到足以测试形状，私密到还能保持诚实。"],
-            ["03", "打磨", "如果一段聪明话不能让读者更有能力，就把它删掉。"],
-            ["04", "发布", "带着一个未关闭的问题发布，让下一则笔记有地方开始。"],
-          ].map(([number, title, body]) => (
-            <article className="notebook-panel" key={number}>
-              <div className="panel-inner">
-                <span>{number}</span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="framework-section">
-        <div className="section-heading compact">
-          <p>框架笔记</p>
-          <h2>同一种动效语法，也能穿过不同框架。</h2>
-          <span>Vue 与 Svelte 的生命周期笔记，让模式可以迁移，同时不改变页面的气质。</span>
-        </div>
-        <div className="snippet-stage">
-          <button onClick={() => changeSnippet("prev")} aria-label="上一个框架模式">
-            <CaretLeft size={20} />
+        <div className="toolbar-actions">
+          <button className={`ghost-button ${savedNotice ? "is-active" : ""}`} type="button" onClick={saveSettings}>
+            <SealCheck size={18} />
+            {savedNotice ? "已保存" : "保存设置"}
           </button>
-          <div className="snippet-card">
+          <button className="ghost-button" type="button" onClick={resetSettings}>
+            <ArrowCounterClockwise size={18} />
+            重置
+          </button>
+          <button className="primary-button" type="button" onClick={exportPng} disabled={!canExport}>
+            <DownloadSimple size={19} weight="bold" />
+            导出透明 PNG
+          </button>
+        </div>
+      </header>
+
+      <section className="workspace" aria-label="电子印章生成器工作台">
+        <section className="preview-stage">
+          <div className="preview-header">
             <div>
-              <BracketsCurly size={22} />
-              <span>{frameworkSnippets[snippetIndex].label}</span>
+              <h2>印面预览</h2>
+              <p>红色文字、边框、防伪编号和做旧纹理都会写入透明 PNG</p>
             </div>
-            <pre>{frameworkSnippets[snippetIndex].code}</pre>
+            <div className="status-chip">
+              <span>{summary}</span>
+              <strong>{stats.coverage}%</strong>
+            </div>
           </div>
-          <button onClick={() => changeSnippet("next")} aria-label="下一个框架模式">
-            <CaretRight size={20} />
-          </button>
-        </div>
-      </section>
 
-      <section className="skill-section">
-        <div className="section-heading">
-          <p>动效技术栈</p>
-          <h2>支撑这次阅读体验的手艺栈。</h2>
-        </div>
-        <div className="skill-grid">
-          {skillCards.map(([name, title, body], index) => (
-            <article className="skill-card" key={name} style={{ "--skill-index": index }}>
-              <div className="skill-icon">{skillIcon(index)}</div>
-              <span>{name}</span>
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </article>
-          ))}
-        </div>
+          <div className="canvas-shell">
+            <canvas ref={canvasRef} aria-label="生成的红色印章预览" />
+            <span className="measure measure-top">900px</span>
+            <span className="measure measure-side">透明背景</span>
+          </div>
+
+          <div className="preview-footer">
+            <span>导出尺寸：900 x 900</span>
+            <span>有效像素：{stats.activePixels.toLocaleString("zh-CN")}</span>
+            <span>格式：透明 PNG</span>
+          </div>
+        </section>
+
+        <aside className="side-panel inspector-panel">
+          <div className="panel-title">
+              <SlidersHorizontal size={21} />
+              <div>
+                <h2>印章设置</h2>
+              <p>文字、章形、尺寸和颜色集中调整</p>
+            </div>
+          </div>
+
+          <details className="settings-section text-settings" open>
+            <summary className="section-toggle">
+              <span className="section-title">文字内容</span>
+              <span className="section-meta">{sealTypeOptions.find((option) => option.value === settings.sealType)?.label}</span>
+            </summary>
+            <div className="tab-switcher">
+              {sealTypeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={settings.sealType === option.value ? "is-selected" : ""}
+                  type="button"
+                  onClick={() => updateSetting("sealType", option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <ControlSelect
+              label="字体样式"
+              value={settings.fontFamily}
+              options={fontOptions}
+              onChange={(value) => updateSetting("fontFamily", value)}
+            />
+            <ControlTextInput
+              label="主体文字"
+              value={settings.mainText}
+              onChange={(value) => updateSetting("mainText", value)}
+              placeholder="公司名称或私章文字"
+            />
+            <ControlTextInput
+              label="防伪码"
+              value={settings.bottomText}
+              onChange={(value) => updateSetting("bottomText", value)}
+              placeholder="合同专用章"
+            />
+            <ControlTextInput
+              label="中心内容"
+              value={settings.centerText}
+              onChange={(value) => updateSetting("centerText", value)}
+              placeholder="★"
+            />
+            <ControlTextInput
+              label="抬头文字"
+              value={settings.headText}
+              onChange={(value) => updateSetting("headText", value)}
+              placeholder="电子印章"
+            />
+            <label className="mini-toggle-row">
+              <span>启用防伪码</span>
+              <input
+                type="checkbox"
+                checked={settings.antiCodeEnabled}
+                onChange={(event) => updateSetting("antiCodeEnabled", event.target.checked)}
+              />
+            </label>
+            <ControlTextInput
+              label="防伪编号"
+              value={settings.antiCodeText}
+              onChange={(value) => updateSetting("antiCodeText", value)}
+              placeholder="NO.20260529"
+            />
+          </details>
+
+          <details className="settings-section" open>
+            <summary className="section-toggle">
+              <span className="section-title">印章样式</span>
+              <span className="section-meta">章形 / 尺寸 / 颜色</span>
+            </summary>
+            <div className="shape-group">
+              <div className="shape-options">
+                {shapeOptions.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <button
+                      key={option.value}
+                      className={settings.shape === option.value ? "is-selected" : ""}
+                      type="button"
+                      onClick={() => updateSetting("shape", option.value)}
+                    >
+                      <Icon size={18} />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="control-grid">
+              <ControlSlider
+                label="印章大小"
+                value={settings.sealSize}
+                min={220}
+                max={380}
+                step={5}
+                suffix=""
+                onChange={(value) => updateSetting("sealSize", value)}
+              />
+              <ControlSlider
+                label="线条粗细"
+                value={settings.lineWidth}
+                min={3}
+                max={26}
+                step={1}
+                suffix=""
+                onChange={(value) => updateSetting("lineWidth", value)}
+              />
+            </div>
+            <div className="border-mode-group">
+              <div className="section-label">
+                <span>边框线型</span>
+                <span>{borderModeOptions.find((option) => option.value === settings.borderMode)?.label}</span>
+              </div>
+              <div className="tab-switcher">
+                {borderModeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    className={settings.borderMode === option.value ? "is-selected" : ""}
+                    type="button"
+                    onClick={() => updateSetting("borderMode", option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="color-control">
+              <div className="section-label">
+                <span>印章颜色</span>
+                <span>{settings.sealColor}</span>
+              </div>
+              <label className="color-row">
+                <input type="color" value={settings.sealColor} onChange={(event) => updateSetting("sealColor", event.target.value)} />
+                <span style={{ background: settings.sealColor }} />
+              </label>
+            </div>
+          </details>
+
+        </aside>
+
+        <section className="advanced-dock" aria-label="高级参数工作区">
+          <div className="dock-header">
+            <div className="panel-title">
+              <SlidersHorizontal size={21} />
+              <div>
+                <h2>高级参数</h2>
+                <p>元素比例、文字细节、纹理和导出横向铺开</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="advanced-dock-grid">
+            <details className="settings-section" open>
+              <summary className="section-toggle">
+                <span className="section-title">元素大小</span>
+                <span className="section-meta">文字比例 / 位置</span>
+              </summary>
+              <div className="control-grid">
+                <ControlSlider
+                label="主体文字大小"
+                value={settings.mainTextSize}
+                min={60}
+                max={260}
+                step={5}
+                  suffix="%"
+                  onChange={(value) => updateSetting("mainTextSize", value)}
+                />
+                <ControlSlider
+                  label="防伪码大小"
+                  value={settings.bottomTextSize}
+                  min={60}
+                  max={160}
+                  step={5}
+                  suffix="%"
+                  onChange={(value) => updateSetting("bottomTextSize", value)}
+                />
+                <ControlSlider
+                  label="抬头文字大小"
+                  value={settings.headTextSize}
+                  min={60}
+                  max={160}
+                  step={5}
+                  suffix="%"
+                  onChange={(value) => updateSetting("headTextSize", value)}
+                />
+                <ControlSlider
+                  label="抬头文字边距"
+                  value={settings.headTextMargin}
+                  min={40}
+                  max={220}
+                  step={5}
+                  suffix="%"
+                  onChange={(value) => updateSetting("headTextMargin", value)}
+                />
+                <ControlSlider
+                  label="中心内容大小"
+                  value={settings.centerTextSize}
+                  min={50}
+                  max={300}
+                  step={5}
+                  suffix="%"
+                  onChange={(value) => updateSetting("centerTextSize", value)}
+                />
+                <ControlSlider
+                  label="印泥浓度"
+                  value={Math.round(settings.inkStrength * 100)}
+                  min={35}
+                  max={100}
+                  step={1}
+                  suffix="%"
+                  onChange={(value) => updateSetting("inkStrength", value / 100)}
+                />
+              </div>
+            </details>
+
+            <details className="settings-section text-detail-section" open>
+              <summary className="section-toggle">
+                <span className="section-title">文字细节</span>
+                <span className="section-meta">主体文字 / 防伪码</span>
+              </summary>
+              <div className="text-detail-grid">
+                <div className="advanced-text-group">
+                  <div className="section-label">
+                    <span>主体文字</span>
+                    <span>弧度 / 间距 / 边距</span>
+                  </div>
+                  <ControlSlider
+                    label="弧度"
+                    value={settings.mainTextArc}
+                    min={60}
+                    max={150}
+                    step={5}
+                    suffix="%"
+                    onChange={(value) => updateSetting("mainTextArc", value)}
+                  />
+                  <ControlSlider
+                    label="间距"
+                    value={settings.mainTextSpacing}
+                    min={70}
+                    max={150}
+                    step={5}
+                    suffix="%"
+                    onChange={(value) => updateSetting("mainTextSpacing", value)}
+                  />
+                  <ControlSlider
+                    label="边距"
+                    value={settings.mainTextMargin}
+                    min={78}
+                    max={112}
+                    step={2}
+                    suffix="%"
+                    onChange={(value) => updateSetting("mainTextMargin", value)}
+                  />
+                  <label className="mini-toggle-row">
+                    <span>加粗</span>
+                    <input
+                      type="checkbox"
+                      checked={settings.mainTextBold}
+                      onChange={(event) => updateSetting("mainTextBold", event.target.checked)}
+                    />
+                  </label>
+                </div>
+
+                <div className="advanced-text-group">
+                  <div className="section-label">
+                    <span>防伪码</span>
+                    <span>弧度 / 间距 / 边距</span>
+                  </div>
+                  <ControlSlider
+                    label="弧度"
+                    value={settings.bottomTextArc}
+                    min={60}
+                    max={170}
+                    step={5}
+                    suffix="%"
+                    onChange={(value) => updateSetting("bottomTextArc", value)}
+                  />
+                  <ControlSlider
+                    label="间距"
+                    value={settings.bottomTextSpacing}
+                    min={70}
+                    max={170}
+                    step={5}
+                    suffix="%"
+                    onChange={(value) => updateSetting("bottomTextSpacing", value)}
+                  />
+                  <ControlSlider
+                    label="边距"
+                    value={settings.bottomTextMargin}
+                    min={76}
+                    max={116}
+                    step={2}
+                    suffix="%"
+                    onChange={(value) => updateSetting("bottomTextMargin", value)}
+                  />
+                  <label className="mini-toggle-row">
+                    <span>加粗</span>
+                    <input
+                      type="checkbox"
+                      checked={settings.bottomTextBold}
+                      onChange={(event) => updateSetting("bottomTextBold", event.target.checked)}
+                    />
+                  </label>
+                </div>
+              </div>
+            </details>
+
+            <details className="settings-section" open>
+              <summary className="section-toggle">
+                <span className="section-title">做旧与导出</span>
+                <span className="section-meta">纹理 / 透明 PNG</span>
+              </summary>
+              <label className="toggle-row">
+                <span>
+                  <strong>做旧纹理</strong>
+                  <small>给边框、文字和图片印面加入轻微磨损</small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.aging}
+                  onChange={(event) => updateSetting("aging", event.target.checked)}
+                />
+              </label>
+              <ControlSlider
+                label="做旧纹理强度"
+                value={settings.agingStrength}
+                min={0}
+                max={35}
+                step={1}
+                suffix="%"
+                onChange={(value) => updateSetting("agingStrength", value)}
+              />
+
+              <div className="export-card">
+                <SealCheck size={20} weight="fill" />
+                <div>
+                  <strong>透明 PNG</strong>
+                  <span>导出文件会去掉背景，仅保留印章边框、文字和防伪编号。</span>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
       </section>
     </main>
   );
 }
 
-function skillIcon(index) {
-  const icons = [
-    <Sparkle size={20} />,
-    <Stack size={20} />,
-    <Compass size={20} />,
-    <FrameCorners size={20} />,
-    <Shuffle size={20} />,
-    <CopySimple size={20} />,
-    <Eye size={20} />,
-    <MouseSimple size={20} />,
-  ];
-  return icons[index] ?? <Feather size={20} />;
+function ControlSlider({ label, value, min, max, step, suffix, onChange }) {
+  return (
+    <label className="control-slider">
+      <span className="control-meta">
+        <strong>{label}</strong>
+        <em>
+          {value}
+          {suffix}
+        </em>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+function ControlTextInput({ label, value, onChange, placeholder }) {
+  return (
+    <label className="text-field">
+      <span>{label}</span>
+      <input value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function ControlSelect({ label, value, options, onChange }) {
+  return (
+    <label className="text-field select-field">
+      <span>{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 export default App;

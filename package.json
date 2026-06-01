@@ -1,21 +1,33 @@
 {
-  "name": "gsap-personal-blog",
-  "private": true,
+  "name": "electronic-seal-generator",
   "version": "0.1.0",
+  "description": "纯前端电子印章 PNG 生成器，支持文字、章形、字体、纹理和透明背景导出。",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lin31523/electronic-seal-generator.git"
+  },
+  "keywords": [
+    "electronic-seal",
+    "seal-generator",
+    "stamp",
+    "react",
+    "vite",
+    "canvas"
+  ],
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@gsap/react": "latest",
     "@phosphor-icons/react": "latest",
-    "@vitejs/plugin-react": "latest",
-    "gsap": "latest",
     "react": "latest",
-    "react-dom": "latest",
-    "vite": "latest"
+    "react-dom": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest"
+  }
 }
