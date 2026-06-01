@@ -15,7 +15,7 @@ import {
 } from "@phosphor-icons/react";
 
 const CANVAS_SIZE = 900;
-const PAID_PRICE_LABEL = "¥1";
+const PAID_PRICE_LABEL = "¥2.99";
 const DEFAULT_SETTINGS = {
   inkStrength: 0.92,
   shape: "circle",
@@ -441,7 +441,7 @@ function App() {
           </button>
           <button className={`ghost-button unlock-button ${paidUnlock ? "is-active" : ""}`} type="button" onClick={openPayment}>
             {paidUnlock ? <CheckCircle size={18} weight="fill" /> : <CreditCard size={18} />}
-            {paidUnlock ? "已去水印" : `${PAID_PRICE_LABEL} 去水印`}
+            {paidUnlock ? "已去水印" : "去水印"}
           </button>
           <button className="primary-button" type="button" onClick={exportPng} disabled={!canExport}>
             <DownloadSimple size={19} weight="bold" />
