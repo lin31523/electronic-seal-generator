@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = {
   inkStrength: 0.92,
   shape: "circle",
   sealType: "company",
-  mainText: "旭格国际建材（北京）有限公司",
+  mainText: "示例科技有限公司",
   bottomText: "合同专用章",
   antiCodeEnabled: false,
   antiCodeText: "NO.20260529",
